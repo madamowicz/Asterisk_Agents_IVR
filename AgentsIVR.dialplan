@@ -1,0 +1,47 @@
+[AgentsIVR]
+exten	=> log,1,NoOp(${CALLERID(num)})
+exten	=> log,n,Wait(2)
+exten	=> log,n,Answer()
+exten	=> log,n,Set(LANGUAGE()=en)
+exten	=> log,n,Set(TIMEOUT(digit)=5)
+exten	=> log,n,Set(TIMEOUT(Response)=10)
+exten	=> log,n(Begin),Background(greeting)
+
+; Assign agentID based on caller extension
+exten	=> 1,1,AgentCallbackLogin(||${CALLERID(num)}@users)
+exten	=> 1,n,AGI(checkagent.agi,${CALLERID(num)},unset)
+exten	=> 1,n,Hangup()
+
+exten	=> 2,1,AGI(checkagent.agi,${CALLERID(num)},set)
+exten	=> 2,n,NoOp(Pause Agent: ${AgentID})
+exten	=> 2,n,PauseQueueMember(|Agent/${AgentID})
+exten	=> 2,n,PlayBack(vm-goodbye)
+exten	=> 2,n,Hangup()
+
+exten	=> 3,1,AGI(checkagent.agi,${CALLERID(num)},unset)
+exten	=> 3,n,NoOp(Unpause Agent: ${AgentID})
+exten	=> 3,n,UnPauseQueueMember(|Agent/${AgentID})
+exten	=> 3,n,PlayBack(vm-goodbye)
+exten	=> 3,n,Hangup()
+
+; Logout agent
+exten	=> 4,1,AGI(checkagent.agi,${CALLERID(num)},del)
+exten	=> 4,n,NoOp(LogOut Agent: ${AgentID})
+;exten	=> 4,n,UnPauseQueueMember(|Agent/${AgentID})
+exten	=> 4,n,System(asterisk -rx "agent logoff Agent/${AgentID}")
+exten	=> 4,n,PlayBack(agent-loggedoff)
+exten	=> 4,n,PlayBack(vm-goodbye)
+exten	=> 4,n,Hangup()
+
+exten	=> t,1,Goto(AgentsIVR,log,Begin)
+
+
+; Pause//Unpause the agent
+exten	=> mod,1,NoOp(${CALLERID(num)})
+exten	=> mod,n,Set(status=1${DB(AgentExten/${CALLERID(num)})})
+exten	=> mod,n,GotoIf($[${status} = 1]?yes:no)
+exten	=> mod,n(yes),Hangup()
+exten	=> mod,n(no),GotoIf($[${status} = 1pause]?unpause:pause)
+exten	=> mod,n(pause),Goto(AgentsIVR,2,1)
+exten	=> mod,n(unpause),Goto(AgentsIVR,3,1)
+exten	=> mod,n,Hangup()
